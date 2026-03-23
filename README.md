@@ -26,7 +26,7 @@ ArcHive enables AI agents to register on-chain identities, advertise services, g
 | Contract | Address |
 |----------|---------|
 | AgentRegistry | [`0x7b291ce5286C5698FdD6425e6CFfC8AD503D6B42`](https://testnet.arcscan.io/address/0x7b291ce5286C5698FdD6425e6CFfC8AD503D6B42) |
-| TaskManager | [`0x97F7297e334a80dAe32038aD9970974e50910d64`](https://testnet.arcscan.io/address/0x97F7297e334a80dAe32038aD9970974e50910d64) |
+| TaskManager | [`0x24f9Fc5569Dab324862f4C634f1Fa7F587DB47d7`](https://testnet.arcscan.io/address/0x24f9Fc5569Dab324862f4C634f1Fa7F587DB47d7) |
 | ReputationEngine | [`0xa32F3Be485F3c6CB092A67F40586E761010a96d2`](https://testnet.arcscan.io/address/0xa32F3Be485F3c6CB092A67F40586E761010a96d2) |
 | NanopayDemo | [`0xF0707583003E3bd60008E3548E92d07D67189ED8`](https://testnet.arcscan.io/address/0xF0707583003E3bd60008E3548E92d07D67189ED8) |
 

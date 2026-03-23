@@ -112,6 +112,12 @@ contract TaskManager {
     /// @notice Mapping: taskId => whether the task has already been rated.
     mapping(uint256 => bool) private _taskRated;
 
+    /// @notice Running total of USDC (6 decimals) paid out to agents.
+    uint256 public totalVolume;
+
+    /// @notice Running count of tasks that reached Approved / Resolved (agent paid).
+    uint256 public totalApprovedTasks;
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
@@ -246,6 +252,10 @@ contract TaskManager {
         // Update agent stats in registry.
         agentRegistry.incrementTasks(t.agent, t.payment);
 
+        // Update aggregate market stats.
+        totalVolume += t.payment;
+        totalApprovedTasks += 1;
+
         emit TaskApproved(taskId, msg.sender, t.agent, t.payment);
     }
 
@@ -268,6 +278,10 @@ contract TaskManager {
 
         // Update agent stats in registry.
         agentRegistry.incrementTasks(t.agent, t.payment);
+
+        // Update aggregate market stats.
+        totalVolume += t.payment;
+        totalApprovedTasks += 1;
 
         emit TaskAutoApproved(taskId, t.agent, t.payment);
     }
@@ -337,6 +351,11 @@ contract TaskManager {
         IERC20 usdc = IERC20(USDC_TOKEN);
         if (favorAgent) {
             require(usdc.transfer(t.agent, t.payment), "TaskManager: USDC transfer to agent failed");
+
+            // Update aggregate market stats.
+            totalVolume += t.payment;
+            totalApprovedTasks += 1;
+
             emit TaskResolved(taskId, t.agent, t.payment);
         } else {
             require(usdc.transfer(t.client, t.payment), "TaskManager: USDC refund to client failed");
@@ -457,6 +476,16 @@ contract TaskManager {
     /// @notice Returns all task IDs assigned to a given agent.
     function getTasksByAgent(address agent) external view returns (uint256[] memory) {
         return _agentTasks[agent];
+    }
+
+    /// @notice Returns aggregate marketplace statistics in a single call.
+    /// @return totalTasks     Total number of tasks ever created.
+    /// @return approvedTasks  Number of tasks where the agent was paid out.
+    /// @return volume         Total USDC (6 decimals) paid out to agents.
+    function getMarketStats() external view returns (uint256 totalTasks, uint256 approvedTasks, uint256 volume) {
+        totalTasks    = tasks.length;
+        approvedTasks = totalApprovedTasks;
+        volume        = totalVolume;
     }
 
     // -------------------------------------------------------------------------

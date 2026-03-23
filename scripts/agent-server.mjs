@@ -40,7 +40,7 @@ const AGENT_PK =
 
 const ARC_RPC         = 'https://rpc.testnet.arc.network';
 const AGENT_REGISTRY  = '0x7b291ce5286C5698FdD6425e6CFfC8AD503D6B42';
-const TASK_MANAGER    = '0x97F7297e334a80dAe32038aD9970974e50910d64';
+const TASK_MANAGER    = '0x24f9Fc5569Dab324862f4C634f1Fa7F587DB47d7';
 const NANOPAY_DEMO    = '0xF0707583003E3bd60008E3548E92d07D67189ED8';
 
 // ── Chain definition ─────────────────────────────────────────────────────────
