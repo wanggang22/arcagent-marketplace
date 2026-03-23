@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @title NanopayDemo
+/// @notice Demo contract for recording nanopayment metadata on-chain.
+///         WARNING: This contract stores UNVERIFIED data for demo/showcase purposes only.
+///         Recorded payments are NOT validated against actual token transfers.
+///         Do not rely on this data for financial accounting or production use.
 contract NanopayDemo {
     struct NanopayRecord {
         address payer;
@@ -9,6 +14,9 @@ contract NanopayDemo {
         string taskType;
         uint256 timestamp;
     }
+
+    /// @dev Maximum number of records that can be stored to prevent unbounded growth.
+    uint256 public constant MAX_RECORDS = 1000;
 
     NanopayRecord[] private _payments;
     mapping(address => uint256[]) private _agentPaymentIndices;
@@ -25,6 +33,9 @@ contract NanopayDemo {
         uint256 amount,
         string calldata taskType
     ) external {
+        require(bytes(taskType).length <= 100, "NanopayDemo: taskType too long");
+        require(_payments.length < MAX_RECORDS, "NanopayDemo: max records reached");
+
         uint256 index = _payments.length;
 
         _payments.push(NanopayRecord({

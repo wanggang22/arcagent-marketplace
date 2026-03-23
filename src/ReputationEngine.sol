@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 contract ReputationEngine {
     address public owner;
+    address public pendingOwner;
     address public taskManager;
 
     struct Review {
@@ -28,6 +29,9 @@ contract ReputationEngine {
         uint256 taskId,
         uint8 rating
     );
+    event TaskManagerUpdated(address indexed oldAddr, address indexed newAddr);
+    event OwnershipTransferProposed(address indexed currentOwner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "ReputationEngine: caller is not the owner");
@@ -45,21 +49,31 @@ contract ReputationEngine {
 
     function setTaskManager(address _taskManager) external onlyOwner {
         require(_taskManager != address(0), "ReputationEngine: zero address");
+        address oldTaskManager = taskManager;
         taskManager = _taskManager;
+        emit TaskManagerUpdated(oldTaskManager, _taskManager);
     }
 
+    /// @notice Rate an agent. Called by TaskManager on behalf of a reviewer.
+    /// @param agent    The agent being rated.
+    /// @param taskId   The task ID associated with this rating.
+    /// @param rating   Rating from 1 to 5.
+    /// @param comment  Optional text comment.
+    /// @param reviewer The address of the actual reviewer (passed by TaskManager).
     function rateAgent(
         address agent,
         uint256 taskId,
         uint8 rating,
-        string calldata comment
+        string calldata comment,
+        address reviewer
     ) external onlyTaskManager {
         require(agent != address(0), "ReputationEngine: zero address agent");
+        require(reviewer != address(0), "ReputationEngine: zero address reviewer");
         require(rating >= 1 && rating <= 5, "ReputationEngine: rating must be 1-5");
 
         _reviews[agent].push(Review({
             taskId: taskId,
-            reviewer: tx.origin,
+            reviewer: reviewer,
             rating: rating,
             comment: comment,
             timestamp: block.timestamp
@@ -70,8 +84,34 @@ contract ReputationEngine {
         rep.totalScore += rating;
         rep.totalTasks += 1;
 
-        emit AgentRated(agent, tx.origin, taskId, rating);
+        emit AgentRated(agent, reviewer, taskId, rating);
     }
+
+    // ──────────────────────────────────────────────
+    //  Ownership Transfer (Two-Step)
+    // ──────────────────────────────────────────────
+
+    /// @notice Propose a new owner. The new owner must call acceptOwnership() to finalize.
+    /// @param newOwner Address of the proposed new owner.
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "ReputationEngine: zero address");
+        require(newOwner != owner, "ReputationEngine: already the owner");
+        pendingOwner = newOwner;
+        emit OwnershipTransferProposed(owner, newOwner);
+    }
+
+    /// @notice Accept ownership after being proposed by the current owner.
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "ReputationEngine: caller is not the pending owner");
+        address previousOwner = owner;
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, owner);
+    }
+
+    // ──────────────────────────────────────────────
+    //  View / Query Functions
+    // ──────────────────────────────────────────────
 
     function getReputation(address agent)
         external

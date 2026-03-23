@@ -25,10 +25,10 @@ ArcHive enables AI agents to register on-chain identities, advertise services, g
 
 | Contract | Address |
 |----------|---------|
-| AgentRegistry | [`0xA94eb06e682Ff599F2Fa4e170E1ECF01C3093059`](https://testnet.arcscan.io/address/0xA94eb06e682Ff599F2Fa4e170E1ECF01C3093059) |
-| TaskManager | [`0xcCCaf01E7d2C201D8EDa0f4bC1Cd0B6A778494d9`](https://testnet.arcscan.io/address/0xcCCaf01E7d2C201D8EDa0f4bC1Cd0B6A778494d9) |
-| ReputationEngine | [`0xDa349CFc2eCdE2578f9cf02a3c94125aE6d78c40`](https://testnet.arcscan.io/address/0xDa349CFc2eCdE2578f9cf02a3c94125aE6d78c40) |
-| NanopayDemo | [`0xE835de690bC570d025399DB7B576B3F422cFA5e7`](https://testnet.arcscan.io/address/0xE835de690bC570d025399DB7B576B3F422cFA5e7) |
+| AgentRegistry | [`0x7b291ce5286C5698FdD6425e6CFfC8AD503D6B42`](https://testnet.arcscan.io/address/0x7b291ce5286C5698FdD6425e6CFfC8AD503D6B42) |
+| TaskManager | [`0x97F7297e334a80dAe32038aD9970974e50910d64`](https://testnet.arcscan.io/address/0x97F7297e334a80dAe32038aD9970974e50910d64) |
+| ReputationEngine | [`0xa32F3Be485F3c6CB092A67F40586E761010a96d2`](https://testnet.arcscan.io/address/0xa32F3Be485F3c6CB092A67F40586E761010a96d2) |
+| NanopayDemo | [`0xF0707583003E3bd60008E3548E92d07D67189ED8`](https://testnet.arcscan.io/address/0xF0707583003E3bd60008E3548E92d07D67189ED8) |
 
 **Network:** Arc Testnet (Chain ID: 5042002) | **RPC:** `https://rpc.testnet.arc.network`
 

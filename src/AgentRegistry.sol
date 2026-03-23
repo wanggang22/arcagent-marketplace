@@ -32,6 +32,9 @@ contract AgentRegistry {
     /// @notice Contract deployer / admin.
     address public owner;
 
+    /// @notice Pending owner for two-step ownership transfer.
+    address public pendingOwner;
+
     /// @notice Authorised TaskManager contract that may call `incrementTasks`.
     address public taskManager;
 
@@ -52,6 +55,10 @@ contract AgentRegistry {
     event AgentUpdated(address indexed agent);
     event AgentDeactivated(address indexed agent);
     event AgentActivated(address indexed agent);
+    event AgentUnregistered(address indexed agent);
+    event TaskManagerUpdated(address indexed oldAddr, address indexed newAddr);
+    event OwnershipTransferProposed(address indexed currentOwner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ──────────────────────────────────────────────
     //  Modifiers
@@ -104,6 +111,7 @@ contract AgentRegistry {
         require(!_registered[msg.sender], "AgentRegistry: already registered");
         require(bytes(_name).length > 0, "AgentRegistry: name is required");
         require(bytes(_endpoint).length > 0, "AgentRegistry: endpoint is required");
+        require(_skillTags.length <= 20, "AgentRegistry: too many tags");
 
         Agent storage a = _agents[msg.sender];
         a.name         = _name;
@@ -143,6 +151,7 @@ contract AgentRegistry {
     ) external onlyRegistered {
         require(bytes(_name).length > 0, "AgentRegistry: name is required");
         require(bytes(_endpoint).length > 0, "AgentRegistry: endpoint is required");
+        require(_skillTags.length <= 20, "AgentRegistry: too many tags");
 
         Agent storage a = _agents[msg.sender];
         a.name         = _name;
@@ -157,6 +166,28 @@ contract AgentRegistry {
         }
 
         emit AgentUpdated(msg.sender);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Unregister
+    // ──────────────────────────────────────────────
+
+    /// @notice Unregister the caller's agent, clearing all data and marking as unregistered.
+    function unregisterAgent() external onlyRegistered {
+        Agent storage a = _agents[msg.sender];
+        delete a.name;
+        delete a.description;
+        delete a.endpoint;
+        a.pricePerTask = 0;
+        delete a.skillTags;
+        a.active = false;
+        a.registeredAt = 0;
+        a.totalTasks = 0;
+        a.totalEarned = 0;
+
+        _registered[msg.sender] = false;
+
+        emit AgentUnregistered(msg.sender);
     }
 
     // ──────────────────────────────────────────────
@@ -200,7 +231,31 @@ contract AgentRegistry {
     /// @param _taskManager Address of the TaskManager contract.
     function setTaskManager(address _taskManager) external onlyOwner {
         require(_taskManager != address(0), "AgentRegistry: zero address");
+        address oldTaskManager = taskManager;
         taskManager = _taskManager;
+        emit TaskManagerUpdated(oldTaskManager, _taskManager);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Ownership Transfer (Two-Step)
+    // ──────────────────────────────────────────────
+
+    /// @notice Propose a new owner. The new owner must call acceptOwnership() to finalize.
+    /// @param newOwner Address of the proposed new owner.
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "AgentRegistry: zero address");
+        require(newOwner != owner, "AgentRegistry: already the owner");
+        pendingOwner = newOwner;
+        emit OwnershipTransferProposed(owner, newOwner);
+    }
+
+    /// @notice Accept ownership after being proposed by the current owner.
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "AgentRegistry: caller is not the pending owner");
+        address previousOwner = owner;
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, owner);
     }
 
     // ──────────────────────────────────────────────
