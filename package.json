@@ -16,6 +16,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@circle-fin/x402-batching": "^2.0.4",
+    "@x402/core": "^2.8.0",
+    "@x402/evm": "^2.8.0",
     "express": "^5.2.1",
     "viem": "^2.47.6"
   },

@@ -2,18 +2,19 @@
 /**
  * agent-server.mjs — ArcAgent AI Agent Execution Bridge
  *
- * A persistent Express server that listens for on-chain tasks assigned to this
- * agent, automatically accepts them, simulates AI processing, submits results,
- * and records nanopayments.  Serves a live status dashboard at GET /.
+ * A persistent Express server that:
+ * 1. Listens for on-chain tasks and auto-processes them
+ * 2. Serves x402 paid API endpoints via Circle Nanopayments (Gateway)
+ * 3. Optionally uses Claude AI for real responses
  *
  * Usage:
  *   AGENT_PK=0x... node scripts/agent-server.mjs
- *   node scripts/agent-server.mjs                # uses default Cast wallet
  *
  * Environment:
- *   AGENT_PK   — private key (hex, with 0x prefix)
- *   PORT       — HTTP port (default 3080)
- *   POLL_MS    — task-poll interval in ms (default 5000)
+ *   AGENT_PK       — private key (hex, with 0x prefix)
+ *   PORT           — HTTP port (default 3080)
+ *   POLL_MS        — task-poll interval in ms (default 5000)
+ *   ANTHROPIC_API_KEY — optional, for real AI responses via Claude
  */
 
 import {
@@ -28,11 +29,13 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import express from 'express';
+import { createGatewayMiddleware } from '@circle-fin/x402-batching/server';
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
 const PORT    = Number(process.env.PORT) || 3080;
 const POLL_MS = Number(process.env.POLL_MS) || 5000;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
 const AGENT_PK = process.env.AGENT_PK;
 if (!AGENT_PK) {
@@ -363,9 +366,133 @@ async function scanExistingTasks() {
   }
 }
 
+// ── x402 Gateway Middleware (Circle Nanopayments) ───────────────────────────
+
+const gateway = createGatewayMiddleware({
+  sellerAddress: account.address,
+  networks: ['eip155:5042002'],  // Arc Testnet
+});
+
+// x402 pricing for paid API endpoints
+const X402_PRICES = {
+  '/api/analyze':   '$0.001',
+  '/api/translate': '$0.0005',
+  '/api/code':      '$0.002',
+};
+
+// x402 stats
+state.x402Calls = 0;
+state.x402Earned = 0n;
+
+// ── Claude AI helper ────────────────────────────────────────────────────────
+
+async function askClaude(systemPrompt, userMessage) {
+  if (!ANTHROPIC_API_KEY) {
+    return '[AI unavailable — set ANTHROPIC_API_KEY for real responses]';
+  }
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      }),
+    });
+    const data = await res.json();
+    return data.content?.[0]?.text || 'No response generated.';
+  } catch (err) {
+    log(`Claude API error: ${err.message}`);
+    return `[AI error: ${err.message}]`;
+  }
+}
+
 // ── Express server & dashboard ───────────────────────────────────────────────
 
 const app = express();
+app.use(express.json());
+
+// ── x402 Paid API Endpoints ─────────────────────────────────────────────────
+
+app.get('/api/analyze', gateway.require(X402_PRICES['/api/analyze']), async (req, res) => {
+  const query = req.query.q || 'What are the current trends in AI agents?';
+  log(`x402 /api/analyze: "${query.slice(0, 60)}"`);
+  state.x402Calls++;
+  state.x402Earned += 1000n; // 0.001 USDC in micro units
+
+  const result = await askClaude(
+    'You are a data analyst AI agent on the ArcAgent marketplace. Provide concise, data-driven analysis. Use bullet points. Reply in the same language as the query.',
+    `Analyze: "${query}"`
+  );
+
+  const response = {
+    agent: state.agentName, type: 'data-analysis', query, result,
+    poweredBy: ANTHROPIC_API_KEY ? 'Claude (Anthropic)' : 'Simulated',
+    timestamp: new Date().toISOString(),
+  };
+  res.json(response);
+});
+
+app.get('/api/translate', gateway.require(X402_PRICES['/api/translate']), async (req, res) => {
+  const text = req.query.text || 'Hello world';
+  const to = req.query.to || 'auto';
+  log(`x402 /api/translate: "${text.slice(0, 60)}" → ${to}`);
+  state.x402Calls++;
+  state.x402Earned += 500n;
+
+  const result = await askClaude(
+    'You are a professional translator AI agent. Return ONLY the translated text, nothing else.',
+    to === 'auto'
+      ? `Detect the language and translate to the opposite (Chinese↔English, etc.):\n\n${text}`
+      : `Translate to ${to}:\n\n${text}`
+  );
+
+  const response = {
+    agent: state.agentName, type: 'translation',
+    source: text, targetLanguage: to, result,
+    poweredBy: ANTHROPIC_API_KEY ? 'Claude (Anthropic)' : 'Simulated',
+    timestamp: new Date().toISOString(),
+  };
+  res.json(response);
+});
+
+app.get('/api/code', gateway.require(X402_PRICES['/api/code']), async (req, res) => {
+  const prompt = req.query.q || 'Write a function to check if a number is prime';
+  const lang = req.query.lang || 'javascript';
+  log(`x402 /api/code: "${prompt.slice(0, 60)}" (${lang})`);
+  state.x402Calls++;
+  state.x402Earned += 2000n;
+
+  const result = await askClaude(
+    `You are a code generation AI agent. Generate clean, well-commented ${lang} code. Return ONLY the code block.`,
+    prompt
+  );
+
+  const response = {
+    agent: state.agentName, type: 'code-generation',
+    prompt, language: lang, result,
+    poweredBy: ANTHROPIC_API_KEY ? 'Claude (Anthropic)' : 'Simulated',
+    timestamp: new Date().toISOString(),
+  };
+  res.json(response);
+});
+
+// x402 pricing info endpoint (no payment required)
+app.get('/api/pricing', (_req, res) => {
+  res.json({
+    agent: state.agentName,
+    endpoints: Object.entries(X402_PRICES).map(([path, price]) => ({ path, price })),
+    network: 'Arc Testnet (eip155:5042002)',
+    facilitator: 'Circle Gateway (Nanopayments)',
+    settlement: 'Batched — zero gas for users',
+  });
+});
 
 app.get('/', (_req, res) => {
   const uptime = Math.floor((Date.now() - state.startedAt.getTime()) / 1000);
@@ -451,6 +578,14 @@ app.get('/', (_req, res) => {
           <div class="stat-label">Poll Interval</div>
           <div class="stat-value">${POLL_MS / 1000}s</div>
         </div>
+        <div>
+          <div class="stat-label">x402 API Calls</div>
+          <div class="stat-value">${state.x402Calls}</div>
+        </div>
+        <div>
+          <div class="stat-label">x402 Earned</div>
+          <div class="stat-value">${formatUnits(state.x402Earned, 6)} USDC</div>
+        </div>
       </div>
     </div>
 
@@ -476,6 +611,8 @@ app.get('/status', (_req, res) => {
     status: state.status,
     tasksProcessed: state.tasksProcessed,
     totalEarned: formatUnits(state.totalEarned, 6),
+    x402Calls: state.x402Calls,
+    x402Earned: formatUnits(state.x402Earned, 6),
     uptime: Math.floor((Date.now() - state.startedAt.getTime()) / 1000),
     recentLogs: state.recentLogs,
   });
