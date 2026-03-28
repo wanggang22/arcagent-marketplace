@@ -1109,7 +1109,7 @@ nav{display:flex;align-items:center;gap:8px}
           </div>
           <div id="gatewayStatus" style="font-size:.82rem;color:var(--text-muted)"></div>
           <div style="font-size:.72rem;color:var(--text-muted);margin-top:8px;line-height:1.5">
-            Deposit USDC into Circle Gateway to use x402 nanopayments (zero gas). Withdraw anytime.
+            Deposit USDC into Circle Gateway to use x402 nanopayments (zero gas). Withdrawal uses 7-day trustless timelock for security.
           </div>
         </div>
       </div>
@@ -2644,16 +2644,25 @@ async function loadGatewayBalance() {
   document.getElementById('gatewayConnected').classList.remove('hidden');
 
   try {
-    // Wallet USDC balance
+    // Wallet USDC balance (on-chain)
     const walBal = await rpcCall(CONTRACTS.USDC, SEL.balanceOf + encodeAddress(userAccount));
     document.getElementById('walletUsdcBalance').textContent = (Number(BigInt(walBal)) / 1e6).toFixed(2) + ' USDC';
+  } catch(e) {
+    document.getElementById('walletUsdcBalance').textContent = '-- USDC';
+  }
 
-    // Gateway balance (balanceOf on Gateway Wallet contract)
-    const gwBal = await rpcCall(X402_GATEWAY_WALLET, SEL.balanceOf + encodeAddress(userAccount));
-    document.getElementById('gatewayBalance').textContent = (Number(BigInt(gwBal)) / 1e6).toFixed(4) + ' USDC';
+  try {
+    // Gateway balance (via Circle Gateway API)
+    const gwRes = await fetch('https://gateway-api-testnet.circle.com/v1/balances', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'USDC', sources: [{ depositor: userAccount, domain: 26 }] }),
+    });
+    const gwData = await gwRes.json();
+    const bal = gwData.balances?.[0]?.balance || '0';
+    document.getElementById('gatewayBalance').textContent = parseFloat(bal).toFixed(4) + ' USDC';
   } catch(e) {
     document.getElementById('gatewayBalance').textContent = '-- USDC';
-    document.getElementById('walletUsdcBalance').textContent = '-- USDC';
   }
 }
 
@@ -2703,21 +2712,21 @@ async function gatewayWithdraw() {
   const amount = Math.round(parseFloat(amountStr) * 1e6);
   if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
 
-  const btn = document.getElementById('withdrawBtn');
-  const status = document.getElementById('gatewayStatus');
+  var btn = document.getElementById('withdrawBtn');
+  var status = document.getElementById('gatewayStatus');
 
   try {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
-    status.textContent = 'Withdrawing from Gateway...';
+    status.textContent = 'Initiating withdrawal (7-day trustless withdrawal)...';
 
-    // withdraw(address token) selector: 0x51cff8d9 — withdraws full balance
-    const withdrawData = '0x51cff8d9' + encodeAddress(CONTRACTS.USDC);
-    const withdrawTx = await sendTx(X402_GATEWAY_WALLET, withdrawData);
+    // initiateWithdrawal(address token, uint256 value) selector: 0xc8393ba9
+    var withdrawData = '0xc8393ba9' + encodeAddress(CONTRACTS.USDC) + encodeUint(amount);
+    var withdrawTx = await sendTx(X402_GATEWAY_WALLET, withdrawData);
     await waitForTx(withdrawTx);
 
-    showToast('Withdrew ' + amountStr + ' USDC from Gateway!', 'success', withdrawTx);
-    status.textContent = 'Withdrawal complete!';
+    showToast('Withdrawal initiated! Complete after 7-day timelock.', 'success', withdrawTx);
+    status.innerHTML = 'Withdrawal initiated for ' + amountStr + ' USDC. After 7 days, return here to complete withdrawal by calling withdraw.';
     document.getElementById('gatewayAmount').value = '';
     loadGatewayBalance();
   } catch(e) {
