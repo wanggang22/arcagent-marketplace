@@ -1742,18 +1742,21 @@ async function loadAgents() {
         });
       }
 
-      await Promise.all(allAgents.map(async (ag) => {
-        try {
-          const repData = SEL.getReputation + encodeAddress(ag.address);
-          const repRes = await rpcCall(CONTRACTS.ReputationEngine, repData);
-          const repRaw = repRes.replace(/^0x/, '');
-          const totalTasksRep = Number(decodeUint(repRaw, 0));
-          const avgX100 = Number(decodeUint(repRaw, 32));
-          const totalRatings = Number(decodeUint(repRaw, 64));
-          ag.rating = avgX100 / 100;
-          ag.ratingCount = totalRatings;
-        } catch(e) { /* no rep data */ }
-      }));
+      // Load reputation in batches of 5 to avoid RPC rate limiting (429)
+      for (let b = 0; b < allAgents.length; b += 5) {
+        const batch = allAgents.slice(b, b + 5);
+        await Promise.all(batch.map(async (ag) => {
+          try {
+            const repData = SEL.getReputation + encodeAddress(ag.address);
+            const repRes = await rpcCall(CONTRACTS.ReputationEngine, repData);
+            const repRaw = repRes.replace(/^0x/, '');
+            const avgX100 = Number(decodeUint(repRaw, 32));
+            const totalRatings = Number(decodeUint(repRaw, 64));
+            ag.rating = avgX100 / 100;
+            ag.ratingCount = totalRatings;
+          } catch(e) { /* no rep data */ }
+        }));
+      }
 
       applyFilters();
     })(), 10000, 'Agents loading');
