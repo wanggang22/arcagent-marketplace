@@ -2504,7 +2504,7 @@ async function runX402Flow(apiPath, amountMicroUSDC, taskName) {
 
     // Step 2: Build x402 payment payload
     markStep(1, 'active');
-    const paymentPayload = { x402Version: payReq.x402Version || 2, scheme: accept.scheme, network: accept.network, payload: { signature, authorization: { from: userAccount, to: accept.payTo, value: accept.amount, validAfter: '0', validBefore: String(validBefore), nonce } } };
+    const paymentPayload = { x402Version: payReq.x402Version || 2, accepted: accept, payload: { signature, authorization: { from: userAccount, to: accept.payTo, value: accept.amount, validAfter: '0', validBefore: String(validBefore), nonce } } };
     markStep(1, 'done');
 
     // Step 3: Send to agent with payment signature
